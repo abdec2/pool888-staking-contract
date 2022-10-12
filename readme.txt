@@ -1,0 +1,1 @@
+staking contract 0xc0274E11cca5561c15060a59D5999E15C14b9908
