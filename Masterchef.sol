@@ -148,7 +148,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
             uint256 tokenReward = multiplier.mul(tokenPerSecond).mul(pool.allocPoint).div(totalAllocPoint);
             accTokenPerShare = accTokenPerShare.add(tokenReward.mul(1e12).div(lpSupply)); // tokenReward.mul(1e12).div(lpSupply)
         }
-        uint256 pending = user.amount.mul(accTokenPerShare).mul(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(accTokenPerShare).div(1e12).sub(user.rewardDebt);
         return pending.add(user.rewardLockedUp);
     }
 
