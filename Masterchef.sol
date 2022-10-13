@@ -4,13 +4,14 @@ pragma solidity ^0.8.0;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
-
-
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/security/ReentrancyGuard.sol";
 
+interface TripleEight is IERC20 {
+    function mint(address to, uint256 amount) external;
+
+}
 
 contract MasterChef is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
@@ -46,7 +47,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
     }
 
     // The 888 TOKEN!
-    IERC20 public myToken;
+    TripleEight public myToken;
     // Dev address.
     address public devAddress;
     // Deposit Fee address
@@ -84,7 +85,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
     event RewardLockedUp(address indexed user, uint256 indexed pid, uint256 amountLockedUp);
 
     constructor(
-        IERC20 _mytoken,
+        TripleEight _mytoken,
         uint256 _tokenPerSecond
     )  {
         myToken = _mytoken;
@@ -180,7 +181,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
         uint256 multiplier = getMultiplier(pool.lastRewardTime, block.timestamp);
         uint256 tokenReward = multiplier.mul(tokenPerSecond).mul(pool.allocPoint).div(totalAllocPoint);
         // lion.mint(devAddress, lionReward.div(10));
-        // lion.mint(address(this), lionReward);
+        myToken.mint(address(this), tokenReward);
         pool.accTokenPerShare = pool.accTokenPerShare.add(tokenReward.mul(1e12).div(lpSupply)); // tokenReward.mul(1e12).div(lpSupply)
         pool.lastRewardTime = block.timestamp;
     }
