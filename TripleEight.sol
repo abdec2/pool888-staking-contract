@@ -15,13 +15,13 @@ contract TripleEight is ERC20, ERC20Burnable, ERC20Snapshot, AccessControl, Paus
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant EXTENDER_ROLE = keccak256("EXTENDER_ROLE");
 
-    uint256 public ApprovedSupply = 888 * 10 ** (decimals()) ; 
+    uint256 public ApprovedSupply = 88888 * 10 ** (decimals()) ; 
 
     constructor() ERC20("888", "888") ERC20Permit("Mercury Chip") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SNAPSHOT_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
-        _mint(msg.sender, 178 * 10 ** decimals());
+        _mint(msg.sender, 23888 * 10 ** decimals());
         _grantRole(MINTER_ROLE, msg.sender);
     }
 
