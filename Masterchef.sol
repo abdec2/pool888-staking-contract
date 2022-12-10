@@ -1,12 +1,25 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.9;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/security/ReentrancyGuard.sol";
+import "hardhat/console.sol";
+
+
+interface T8Referral {
+    struct Referral {
+        address parent_address;
+        uint8 level;
+        uint com_per;
+    }
+    function recordReferral(address user, address referrer, uint _packageId) external;
+    function recordReferralCommission(address referrer, uint256 commission) external;
+    function getReferrer(address user) external view returns (Referral[] memory);
+}
 
 interface TripleEight is IERC20 {
     function mint(address to, uint256 amount) external;
@@ -71,7 +84,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
     uint256 public totalLockedUpRewards;
 
     // 888 referral contract address.
-    // ILionReferral public lionReferral;
+    T8Referral public T8ReferralContract;
     // Referral commission rate in basis points.
     // uint16 public referralCommissionRate = 300;
     // Max referral commission rate: 10%.
@@ -187,13 +200,13 @@ contract MasterChef is Ownable, ReentrancyGuard {
     }
 
     // Deposit LP tokens to MasterChef for 888 allocation.
-    function deposit(uint256 _pid, uint256 _amount) public nonReentrant { // address _referrer
+    function deposit(uint256 _pid, uint256 _amount, uint _packageId, address _referrer) public nonReentrant { // address _referrer
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
-        // if (_amount > 0 && address(lionReferral) != address(0) && _referrer != address(0) && _referrer != msg.sender) {
-        //     lionReferral.recordReferral(msg.sender, _referrer);
-        // }
+        if (_amount > 0 && address(T8ReferralContract) != address(0) && _referrer != msg.sender) {
+            T8ReferralContract.recordReferral(msg.sender, _referrer, _packageId);
+        }
         payOrLockupPendingLion(_pid);
         if (_amount > 0) {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
@@ -214,7 +227,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
     }
 
     // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _pid, uint256 _amount, uint256 commission) public nonReentrant {
+    function withdraw(uint256 _pid, uint256 _amount) public nonReentrant {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -223,11 +236,6 @@ contract MasterChef is Ownable, ReentrancyGuard {
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
             pool.lpToken.safeTransfer(address(msg.sender), _amount);
-        }
-
-        // remove it from final deployment
-        if (commission > 0) {
-            myToken.mint(address(msg.sender), commission);
         }
 
         user.rewardDebt = user.amount.mul(pool.accTokenPerShare).div(1e12); // .div(1e12)
@@ -268,7 +276,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
 
                 // send rewards
                 safeTokenTransfer(msg.sender, totalRewards);
-                //payReferralCommission(msg.sender, totalRewards);
+                payReferralCommission(msg.sender, totalRewards);
             }
         } else if (pending > 0) {
             user.rewardLockedUp = user.rewardLockedUp.add(pending);
@@ -308,9 +316,9 @@ contract MasterChef is Ownable, ReentrancyGuard {
     }
 
     // Update the lion referral contract address by the owner
-    // function setLionReferral(ILionReferral _lionReferral) public onlyOwner {
-    //     lionReferral = _lionReferral;
-    // }
+    function setT8Referral(T8Referral _T8Referral) public onlyOwner {
+        T8ReferralContract = _T8Referral;
+    }
 
     // Update referral commission rate by the owner
     // function setReferralCommissionRate(uint16 _referralCommissionRate) public onlyOwner {
@@ -319,16 +327,19 @@ contract MasterChef is Ownable, ReentrancyGuard {
     // }
 
     // Pay referral commission to the referrer who referred this user.
-    // function payReferralCommission(address _user, uint256 _pending) internal {
-    //     if (address(lionReferral) != address(0) && referralCommissionRate > 0) {
-    //         address referrer = lionReferral.getReferrer(_user);
-    //         uint256 commissionAmount = _pending.mul(referralCommissionRate).div(10000);
-
-    //         if (referrer != address(0) && commissionAmount > 0) {
-    //             lion.mint(referrer, commissionAmount);
-    //             lionReferral.recordReferralCommission(referrer, commissionAmount);
-    //             emit ReferralCommissionPaid(_user, referrer, commissionAmount);
-    //         }
-    //     }
-    // }
+    function payReferralCommission(address _user, uint256 _pending) internal {
+        if (address(T8ReferralContract) != address(0)) {
+             T8Referral.Referral[] memory referrers = T8ReferralContract.getReferrer(_user);
+             for(uint i=0; i < referrers.length; i++){
+                 uint256 commissionAmount = _pending.mul(referrers[i].com_per).div(10000);
+                 if (referrers[i].parent_address != address(0) && commissionAmount > 0) {
+                    myToken.mint(referrers[i].parent_address, commissionAmount);
+                    T8ReferralContract.recordReferralCommission(referrers[i].parent_address, commissionAmount);
+                    emit ReferralCommissionPaid(_user, referrers[i].parent_address, commissionAmount);
+                }
+                 
+             }
+            
+        }
+    }
 }

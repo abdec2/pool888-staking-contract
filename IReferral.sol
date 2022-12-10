@@ -16,5 +16,5 @@ interface IReferral {
     /**
      * @dev Get the referrer address that referred the user.
      */
-    function getReferrer(address user) external view returns (address);
+    function getReferrer(address user) external view returns (Referral memory);
 }
