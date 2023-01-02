@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.9;
+pragma abicoder v2;
 
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/security/ReentrancyGuard.sol";
-import "hardhat/console.sol";
+
 
 
 interface T8Referral {
@@ -29,6 +31,11 @@ interface TripleEight is IERC20 {
 contract MasterChef is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20  for IERC20;
+
+    ISwapRouter public immutable swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    address public constant WETH9 = 0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889;
+    uint24 public constant poolFee = 3000;
+
 
     // Info of each user.
     struct UserInfo {
@@ -99,14 +106,15 @@ contract MasterChef is Ownable, ReentrancyGuard {
 
     constructor(
         TripleEight _mytoken,
-        uint256 _tokenPerSecond
+        uint256 _tokenPerSecond, 
+        address _feeCollector
     )  {
         myToken = _mytoken;
         startTime = block.timestamp;
         tokenPerSecond = _tokenPerSecond;
 
         devAddress = msg.sender;
-        feeAddress = msg.sender;
+        feeAddress = _feeCollector;
     }
 
     function poolLength() external view returns (uint256) {
@@ -199,27 +207,49 @@ contract MasterChef is Ownable, ReentrancyGuard {
         pool.lastRewardTime = block.timestamp;
     }
 
+    // swap function
+    function swapExactInputSingle(uint256 amountIn, IERC20 lpToken) public returns (uint256 amountOut) {
+
+        lpToken.safeApprove(address(swapRouter), amountIn);
+
+        ISwapRouter.ExactInputSingleParams memory params =
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: address(lpToken),
+                tokenOut: address(myToken),
+                fee: poolFee,
+                recipient: msg.sender,
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        amountOut = swapRouter.exactInputSingle(params);
+    }
+
+
     // Deposit LP tokens to MasterChef for 888 allocation.
     function deposit(uint256 _pid, uint256 _amount, uint _packageId, address _referrer) public nonReentrant { // address _referrer
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
         if (_amount > 0 && address(T8ReferralContract) != address(0) && _referrer != msg.sender) {
-            T8ReferralContract.recordReferral(msg.sender, _referrer, _packageId);
+            T8ReferralContract.recordReferral(msg.sender, _referrer, _packageId, _amount);
         }
         payOrLockupPendingLion(_pid);
         if (_amount > 0) {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-            // if (address(pool.lpToken) == address(lion)) {
-            //     uint256 transferTax = _amount.mul(lion.transferTaxRate()).div(10000);
-            //     _amount = _amount.sub(transferTax);
-            // }
+
             if (pool.depositFeeBP > 0) {
                 uint256 depositFee = _amount.mul(pool.depositFeeBP).div(10000);
                 pool.lpToken.safeTransfer(feeAddress, depositFee);
-                user.amount = user.amount.add(_amount).sub(depositFee);
+                uint256 swapAmountIn = _amount.sub(depositFee).mul(4000).div(10000);
+                swapExactInputSingle(swapAmountIn, pool.lpToken);
+                user.amount = user.amount.add(_amount).sub(depositFee).sub(swapAmountIn);
             } else {
-                user.amount = user.amount.add(_amount);
+                uint256 swapAmountIn = _amount.mul(4000).div(10000);
+                swapExactInputSingle(swapAmountIn, pool.lpToken);
+                user.amount = user.amount.add(_amount).sub(swapAmountIn);
             }
         }
         user.rewardDebt = user.amount.mul(pool.accTokenPerShare).div(1e12); // .div(1e12)

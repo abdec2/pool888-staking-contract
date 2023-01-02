@@ -17,6 +17,7 @@ contract T8Referral is Ownable {
 
     struct Packages {
         string name;
+        uint cost;
         uint referral_levels;
         uint commission_level_1;
         uint commission_level_2;
@@ -39,11 +40,11 @@ contract T8Referral is Ownable {
 
 
     constructor() {
-        packageById[1] = Packages("Freedom", 0, 0,0,0,0);
-        packageById[2] = Packages("Bronze", 1, 200,0,0,0);
-        packageById[3] = Packages("Silver", 2, 300,200,0,0);
-        packageById[4] = Packages("Gold", 3, 500,200,100,0);
-        packageById[5] = Packages("Platinum", 4, 1000,500,200,100);
+        packageById[1] = Packages("Freedom", 0,0,0,0,0,0);
+        packageById[2] = Packages("Bronze", 1,500*10**6,200,0,0,0);
+        packageById[3] = Packages("Silver", 2,1000*10**6,300,200,0,0);
+        packageById[4] = Packages("Gold", 3,3000*10**6,500,200,100,0);
+        packageById[5] = Packages("Platinum", 4,10000*10**6,1000,500,200,100);
     }
 
     modifier onlyOperator {
@@ -51,7 +52,8 @@ contract T8Referral is Ownable {
         _;
     }
 
-    function recordReferral(address _user, address _referrer, uint _packageId) public onlyOperator {
+    function recordReferral(address _user, address _referrer, uint _packageId, uint256 _amount) public onlyOperator {
+        require(_amount >= packageById[_packageId].cost, "Invalid Amount");
         if(userPackageId[_user] == 0) {
             // assign package to user 
             userPackageId[_user] = _packageId;
