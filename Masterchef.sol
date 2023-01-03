@@ -18,7 +18,7 @@ interface T8Referral {
         uint8 level;
         uint com_per;
     }
-    function recordReferral(address user, address referrer, uint _packageId) external;
+    function recordReferral(address user, address referrer, uint _packageId, uint _amount) external;
     function recordReferralCommission(address referrer, uint256 commission) external;
     function getReferrer(address user) external view returns (Referral[] memory);
 }
@@ -33,8 +33,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
     using SafeERC20  for IERC20;
 
     ISwapRouter public immutable swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
-    address public constant WETH9 = 0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889;
-    uint24 public constant poolFee = 3000;
+    uint24 public constant poolFee = 500;
 
 
     // Info of each user.
@@ -68,8 +67,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
 
     // The 888 TOKEN!
     TripleEight public myToken;
-    // Dev address.
-    address public devAddress;
+
     // Deposit Fee address
     address public feeAddress;
     // 888 tokens created per second.
@@ -113,7 +111,6 @@ contract MasterChef is Ownable, ReentrancyGuard {
         startTime = block.timestamp;
         tokenPerSecond = _tokenPerSecond;
 
-        devAddress = msg.sender;
         feeAddress = _feeCollector;
     }
 
@@ -201,7 +198,6 @@ contract MasterChef is Ownable, ReentrancyGuard {
         }
         uint256 multiplier = getMultiplier(pool.lastRewardTime, block.timestamp);
         uint256 tokenReward = multiplier.mul(tokenPerSecond).mul(pool.allocPoint).div(totalAllocPoint);
-        // lion.mint(devAddress, lionReward.div(10));
         myToken.mint(address(this), tokenReward);
         pool.accTokenPerShare = pool.accTokenPerShare.add(tokenReward.mul(1e12).div(lpSupply)); // tokenReward.mul(1e12).div(lpSupply)
         pool.lastRewardTime = block.timestamp;
@@ -272,19 +268,6 @@ contract MasterChef is Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
-    // Withdraw without caring about rewards. EMERGENCY ONLY.
-    // function emergencyWithdraw(uint256 _pid) public nonReentrant {
-    //     PoolInfo storage pool = poolInfo[_pid];
-    //     UserInfo storage user = userInfo[_pid][msg.sender];
-    //     uint256 amount = user.amount;
-    //     user.amount = 0;
-    //     user.rewardDebt = 0;
-    //     user.rewardLockedUp = 0;
-    //     user.nextHarvestUntil = 0;
-    //     pool.lpToken.safeTransfer(address(msg.sender), amount);
-    //     emit EmergencyWithdraw(msg.sender, _pid, amount);
-    // }
-
     // Pay or lockup pending 888s.
     function payOrLockupPendingLion(uint256 _pid) internal {
         PoolInfo storage pool = poolInfo[_pid];
@@ -325,13 +308,6 @@ contract MasterChef is Ownable, ReentrancyGuard {
         }
     }
 
-    // Update dev address by the previous dev.
-    function setDevAddress(address _devAddress) public {
-        require(msg.sender == devAddress, "setDevAddress: FORBIDDEN");
-        require(_devAddress != address(0), "setDevAddress: ZERO");
-        devAddress = _devAddress;
-    }
-
     function setFeeAddress(address _feeAddress) public {
         require(msg.sender == feeAddress, "setFeeAddress: FORBIDDEN");
         require(_feeAddress != address(0), "setFeeAddress: ZERO");
@@ -345,16 +321,10 @@ contract MasterChef is Ownable, ReentrancyGuard {
         tokenPerSecond = _tokenPerSecond;
     }
 
-    // Update the lion referral contract address by the owner
+    // Update the 888 referral contract address by the owner
     function setT8Referral(T8Referral _T8Referral) public onlyOwner {
         T8ReferralContract = _T8Referral;
     }
-
-    // Update referral commission rate by the owner
-    // function setReferralCommissionRate(uint16 _referralCommissionRate) public onlyOwner {
-    //     require(_referralCommissionRate <= MAXIMUM_REFERRAL_COMMISSION_RATE, "setReferralCommissionRate: invalid referral commission rate basis points");
-    //     referralCommissionRate = _referralCommissionRate;
-    // }
 
     // Pay referral commission to the referrer who referred this user.
     function payReferralCommission(address _user, uint256 _pending) internal {
