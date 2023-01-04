@@ -54,15 +54,11 @@ contract T8Referral is Ownable {
 
     function recordReferral(address _user, address _referrer, uint _packageId, uint _amount) public onlyOperator {
         require(_amount >= packageById[_packageId].cost, "Invalid Amount");
-        if(userPackageId[_user] == 0) {
+        if( userPackageId[_user] == 0 || userPackageId[_user] == 1 ) {
             // assign package to user 
             userPackageId[_user] = _packageId;
         }
-        if (_user != address(0)
-        && _referrer != address(0)
-        && _user != _referrer
-            && referrers[_user] == address(0)
-        ) {
+        if ( _user != address(0) && _referrer != address(0) && _user != _referrer && referrers[_user] == address(0) ) {
             referrers[_user] = _referrer;
             referralsCount[_referrer] += 1;
             uint currnt_pkg_level = 0;
@@ -94,8 +90,6 @@ contract T8Referral is Ownable {
                 wallet_address = parent_address;
                 currnt_pkg_level += 1;
             }
-
-
 
             emit ReferralRecorded(_user, _referrer);
         }

@@ -95,11 +95,13 @@ contract MasterChef is Ownable, ReentrancyGuard {
     // Max referral commission rate: 10%.
     // uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
 
-    event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
+    event Deposit(address indexed user, uint256 indexed pid, uint256 amount, uint _packageId);
+    event TokenPurchased(address indexed user, address indexed lpToken, address indexed purchaseToken, uint256 amount);
+    event FeeDeducted(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmissionRateUpdated(address indexed caller, uint256 previousAmount, uint256 newAmount);
-    event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);
+    event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount, uint8 level);
     event RewardLockedUp(address indexed user, uint256 indexed pid, uint256 amountLockedUp);
 
     constructor(
@@ -221,6 +223,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
             });
 
         amountOut = swapRouter.exactInputSingle(params);
+        emit TokenPurchased(msg.sender, address(lpToken), address(myToken) , amountIn);
     }
 
 
@@ -239,17 +242,26 @@ contract MasterChef is Ownable, ReentrancyGuard {
             if (pool.depositFeeBP > 0) {
                 uint256 depositFee = _amount.mul(pool.depositFeeBP).div(10000);
                 pool.lpToken.safeTransfer(feeAddress, depositFee);
-                uint256 swapAmountIn = _amount.sub(depositFee).mul(4000).div(10000);
-                swapExactInputSingle(swapAmountIn, pool.lpToken);
+                emit FeeDeducted(msg.sender, _pid, depositFee);
+                uint256 swapAmountIn = 0;
+                if(_packageId != 1) {
+                    swapAmountIn = _amount.sub(depositFee).mul(4000).div(10000);
+                    swapExactInputSingle(swapAmountIn, pool.lpToken);
+                }
                 user.amount = user.amount.add(_amount).sub(depositFee).sub(swapAmountIn);
+                emit Deposit(msg.sender, _pid, user.amount, _packageId);
             } else {
-                uint256 swapAmountIn = _amount.mul(4000).div(10000);
-                swapExactInputSingle(swapAmountIn, pool.lpToken);
+                uint256 swapAmountIn = 0;
+                if(_packageId != 1) {
+                    swapAmountIn = _amount.mul(4000).div(10000);
+                    swapExactInputSingle(swapAmountIn, pool.lpToken);
+                }
                 user.amount = user.amount.add(_amount).sub(swapAmountIn);
+                emit Deposit(msg.sender, _pid, user.amount, _packageId);
             }
         }
         user.rewardDebt = user.amount.mul(pool.accTokenPerShare).div(1e12); // .div(1e12)
-        emit Deposit(msg.sender, _pid, _amount);
+        
     }
 
     // Withdraw LP tokens from MasterChef.
@@ -335,7 +347,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
                  if (referrers[i].parent_address != address(0) && commissionAmount > 0) {
                     myToken.mint(referrers[i].parent_address, commissionAmount);
                     T8ReferralContract.recordReferralCommission(referrers[i].parent_address, commissionAmount);
-                    emit ReferralCommissionPaid(_user, referrers[i].parent_address, commissionAmount);
+                    emit ReferralCommissionPaid(_user, referrers[i].parent_address, commissionAmount, referrers[i].level);
                 }
                  
              }
