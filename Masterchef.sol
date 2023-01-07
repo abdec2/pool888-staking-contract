@@ -21,6 +21,8 @@ interface T8Referral {
     function recordReferral(address user, address referrer, uint _packageId, uint _amount) external;
     function recordReferralCommission(address referrer, uint256 commission) external;
     function getReferrer(address user) external view returns (Referral[] memory);
+    function gratitudeRewardUserCount(address user) external view returns (uint256);
+    function getGratitudeRewardUsers(address user) external view returns (address[] memory);
 }
 
 interface TripleEight is IERC20 {
@@ -77,6 +79,9 @@ contract MasterChef is Ownable, ReentrancyGuard {
     // Max harvest interval: 14 days.
     uint256 public constant MAXIMUM_HARVEST_INTERVAL = 14 days;
 
+    // Gratitude Reward Percentage in Bips
+    uint16 public gratitudeRewardPercentage = 500;
+
     // Info of each pool.
     PoolInfo[] public poolInfo;
     // Info of each user that stakes LP tokens.
@@ -102,6 +107,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmissionRateUpdated(address indexed caller, uint256 previousAmount, uint256 newAmount);
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount, uint8 level);
+    event GratitudeRewardPaid(address indexed to, address indexed from, uint256 commissionAmount);
     event RewardLockedUp(address indexed user, uint256 indexed pid, uint256 amountLockedUp);
 
     constructor(
@@ -333,6 +339,10 @@ contract MasterChef is Ownable, ReentrancyGuard {
         tokenPerSecond = _tokenPerSecond;
     }
 
+    function setGratitudeRewardPercentage(uint16 _percentage) external onlyOwner {
+        gratitudeRewardPercentage = _percentage;
+    }
+
     // Update the 888 referral contract address by the owner
     function setT8Referral(T8Referral _T8Referral) public onlyOwner {
         T8ReferralContract = _T8Referral;
@@ -345,13 +355,27 @@ contract MasterChef is Ownable, ReentrancyGuard {
              for(uint i=0; i < referrers.length; i++){
                  uint256 commissionAmount = _pending.mul(referrers[i].com_per).div(10000);
                  if (referrers[i].parent_address != address(0) && commissionAmount > 0) {
-                    myToken.mint(referrers[i].parent_address, commissionAmount);
-                    T8ReferralContract.recordReferralCommission(referrers[i].parent_address, commissionAmount);
-                    emit ReferralCommissionPaid(_user, referrers[i].parent_address, commissionAmount, referrers[i].level);
+                    address[] memory gra_users = T8ReferralContract.getGratitudeRewardUsers(referrers[i].parent_address);
+                    uint256 gra_reward = 0;
+                    if(gra_users.length > 0) {
+                        gra_reward = commissionAmount.mul(gratitudeRewardPercentage).div(10000);
+                        payGratitudeReward(_user, gra_reward, gra_users);
+                    }
+                    myToken.mint(referrers[i].parent_address, commissionAmount.sub(gra_reward));
+                    T8ReferralContract.recordReferralCommission(referrers[i].parent_address, commissionAmount.sub(gra_reward));
+                    emit ReferralCommissionPaid(_user, referrers[i].parent_address, commissionAmount.sub(gra_reward), referrers[i].level);
                 }
                  
              }
             
+        }
+    }
+
+    function payGratitudeReward(address __user, uint256 _grat_reward, address[] memory _grat_users) internal {
+        for( uint i=0; i < _grat_users.length; i++ ) {
+            uint256 rewardPayable = _grat_reward.div(_grat_users.length);
+            myToken.mint(_grat_users[i], rewardPayable);
+            emit GratitudeRewardPaid(_grat_users[i], __user, rewardPayable);
         }
     }
 }

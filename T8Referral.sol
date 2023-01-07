@@ -31,6 +31,8 @@ contract T8Referral is Ownable {
     mapping (uint => Packages) public packageById;
     mapping(address => uint) public userPackageId;
 
+    mapping(address => address[]) public gratitudeRewardUsers; // parent address => referred user Address Array
+
     mapping(address => uint256) public referralsCount; // referrer address => referrals count
     mapping(address => uint256) public totalReferralCommissions; // referrer address => total referral commissions
 
@@ -52,6 +54,14 @@ contract T8Referral is Ownable {
         _;
     }
 
+    function gratitudeRewardUserCount(address _user) public view returns(uint256) {
+        return gratitudeRewardUsers[_user].length;
+    }
+
+    function getGratitudeRewardUsers(address _user) public view returns(address[] memory) {
+        return gratitudeRewardUsers[_user];
+    }
+
     function recordReferral(address _user, address _referrer, uint _packageId, uint _amount) public onlyOperator {
         require(_amount >= packageById[_packageId].cost, "Invalid Amount");
         if( userPackageId[_user] == 0 || userPackageId[_user] == 1 ) {
@@ -71,6 +81,9 @@ contract T8Referral is Ownable {
                         uint comm_percent = 0;
                         if(level == 1) {
                             comm_percent = packageById[userPackageId[parent_address]].commission_level_1;
+                            if(userPackageId[parent_address] == 5) {
+                                gratitudeRewardUsers[parent_address].push(_user);
+                            }
                         } 
                         if (level == 2) {
                             comm_percent = packageById[userPackageId[parent_address]].commission_level_2;

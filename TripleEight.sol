@@ -17,7 +17,7 @@ contract TripleEight is ERC20, ERC20Burnable, ERC20Snapshot, AccessControl, Paus
 
     uint256 public ApprovedSupply = 88888 * 10 ** (decimals()) ; 
 
-    constructor() ERC20("888", "888") ERC20Permit("Mercury Chip") {
+    constructor() ERC20("888", "888") ERC20Permit("888") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SNAPSHOT_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
