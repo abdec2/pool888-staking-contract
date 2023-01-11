@@ -104,8 +104,7 @@ contract MasterChef is Ownable, ReentrancyGuard {
     event TokenPurchased(address indexed user, address indexed lpToken, address indexed purchaseToken, uint256 amount);
     event FeeDeducted(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event EmissionRateUpdated(address indexed caller, uint256 previousAmount, uint256 newAmount);
+    event Harvest(address indexed user, uint256 amount);
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount, uint8 level);
     event GratitudeRewardPaid(address indexed to, address indexed from, uint256 commissionAmount);
     event RewardLockedUp(address indexed user, uint256 indexed pid, uint256 amountLockedUp);
@@ -321,8 +320,10 @@ contract MasterChef is Ownable, ReentrancyGuard {
         uint256 tokenBal = myToken.balanceOf(address(this));
         if (_amount > tokenBal) {
             myToken.transfer(_to, tokenBal);
+            emit Harvest(_to, tokenBal);
         } else {
             myToken.transfer(_to, _amount);
+            emit Harvest(_to, _amount);
         }
     }
 
